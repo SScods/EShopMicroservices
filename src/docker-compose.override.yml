@@ -1,5 +1,7 @@
+version: '3.4'
+
 services:
-   catalogdb:
+  catalogdb:
     container_name: catalogdb
     environment:
       - POSTGRES_USER=postgres
@@ -7,11 +9,11 @@ services:
       - POSTGRES_DB=CatalogDb
     restart: always
     ports:
-      - "5432:5432"
+        - "5432:5432"
     volumes:
-      - postgres_catalog:/var/lib/postgresql
-
-   basketdb:
+      - postgres_catalog:/var/lib/postgresql/data/ 
+      
+  basketdb:
     container_name: basketdb
     environment:
       - POSTGRES_USER=postgres
@@ -19,26 +21,26 @@ services:
       - POSTGRES_DB=BasketDb
     restart: always
     ports:
-      - "5433:5432"
+        - "5433:5432"
     volumes:
-      - postgres_basket:/var/lib/postgresql
- 
-   distributedcache:
+      - postgres_basket:/var/lib/postgresql/data/ 
+
+  distributedcache:
     container_name: distributedcache
     restart: always
     ports:
       - "6379:6379"
-    
-   orderdb:
+
+  orderdb:
     container_name: orderdb
     environment:
-     - ACCEPT_EULA=Y
-     - SA_PASSWORD=SwN12345678
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=SwN12345678
     restart: always
     ports:
       - "1433:1433"
 
-   messagebroker:
+  messagebroker:
     container_name: messagebroker
     hostname: ecommerce-mq
     environment:
@@ -46,15 +48,15 @@ services:
       - RABBITMQ_DEFAULT_PASS=guest
     restart: always
     ports:
-       - "5672:5672"
-       - "15672:15672"
+      - "5672:5672"
+      - "15672:15672"
 
-   catalogapi:
+  catalog.api:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_HTTPS_PORTS=8081
-      - ConnectionStrings__Database=Server=catalogdb;Port=5432;Database=CatalogDb;User Id=postgres;Password=postgres; Include Error Detail=true
+      - ConnectionStrings__Database=Server=catalogdb;Port=5432;Database=CatalogDb;User Id=postgres;Password=postgres;Include Error Detail=true
     depends_on:
       - catalogdb
     ports:
@@ -64,12 +66,12 @@ services:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
 
-   basket.api:
+  basket.api:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_HTTPS_PORTS=8081
-      - ConnectionStrings__Database=Server=basketdb;Port=5432;Database=BasketDb;User Id=postgres;Password=postgres; Include Error Detail=true
+      - ConnectionStrings__Database=Server=basketdb;Port=5432;Database=BasketDb;User Id=postgres;Password=postgres;Include Error Detail=true
       - ConnectionStrings__Redis=distributedcache:6379
       - GrpcSettings__DiscountUrl=https://discount.grpc:8081
       - MessageBroker__Host=amqp://ecommerce-mq:5672
@@ -87,19 +89,20 @@ services:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
 
-   discount.grpc:
+  discount.grpc:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_HTTPS_PORTS=8081
       - ConnectionStrings__Database=Data Source=discountdb
     ports:
-     - "6002:8080"
-     - "6062:8081"
+      - "6002:8080"
+      - "6062:8081"
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
-   ordering.api:
+
+  ordering.api:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
@@ -108,17 +111,46 @@ services:
       - MessageBroker__Host=amqp://ecommerce-mq:5672
       - MessageBroker__UserName=guest
       - MessageBroker__Password=guest
-      - FeatureManagement__OrderFullfilment= false
+      - FeatureManagement__OrderFullfilment=false
+    depends_on:
+      - orderdb
+      - messagebroker
     ports:
       - "6003:8080"
       - "6063:8081"
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
-volumes:
-  postgres_catalog:
-  postgres_basket:
-    
+
+  # yarpapigateway:
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #     - ASPNETCORE_HTTP_PORTS=8080
+  #     - ASPNETCORE_HTTPS_PORTS=8081
+  #   depends_on:
+  #     - catalog.api
+  #     - basket.api
+  #     - ordering.api
+  #   ports:
+  #     - "6004:8080"
+  #     - "6064:8081"
+  #   volumes:
+  #     - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+  #     - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
 
 
-
+  yarpapigateway:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTPS_PORTS=8081
+    depends_on:
+      - catalog.api
+      - basket.api
+      - ordering.api
+    ports:
+      - "6004:8080"
+      - "6064:8081"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
